@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>云影聚合</title>
+    <!-- 引入 Axios -->
+    <script src="js/axios.js"></script>
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #0f172a; }
+        iframe { width: 100%; height: 100%; border: none; }
+    </style>
+</head>
+<body>
+    <!-- 嵌入沙盒 UI 页面 -->
+    <iframe id="sandbox-frame" src="ui.html"></iframe>
+
+    <!-- ★★★ 引用外部 JS 文件 (修复 CSP 报错的关键) ★★★ -->
+    <script src="js/bridge.js"></script>
+</body>
+</html>

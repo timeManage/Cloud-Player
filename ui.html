@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>云影聚合</title>
+    
+    <link rel="stylesheet" href="css/tailwind.css">
+
+    <style>
+        body { background-color: #0f172a; color: #e2e8f0; font-family: sans-serif; overflow-x: hidden; }
+        [v-cloak] { display: none !important; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* 颜色定义 */
+        .bg-dark { background-color: #0f172a; }
+        .bg-card { background-color: #1e293b; }
+        .text-primary { color: #3b82f6; }
+        .bg-primary { background-color: #3b82f6; }
+        .border-primary { border-color: #3b82f6; }
+        .bg-primary\/90 { background-color: rgba(59, 130, 246, 0.9); }
+        .bg-black\/40 { background-color: rgba(0, 0, 0, 0.4); }
+        .bg-dark\/90 { background-color: rgba(15, 23, 42, 0.95); }
+    </style>
+    
+    <script src="js/vue.js"></script>
+    <script src="js/artplayer.js"></script>
+    <script src="js/hls.js"></script>
+</head>
+<body>
+
+<div id="app" v-cloak class="min-h-screen flex flex-col">
+
+    <!-- ★★★ 顶部导航栏 (重构版) ★★★ -->
+    <header class="sticky top-0 z-50 bg-dark/90 border-b border-gray-800 shadow-lg backdrop-blur-md">
+        <div class="container mx-auto px-4 h-16 flex items-center justify-between gap-4">
+            
+            <!-- Logo -->
+            <div class="text-xl font-bold flex items-center gap-2 cursor-pointer select-none text-white hover:opacity-80 transition" @click="resetHome">
+                <svg class="w-8 h-8 text-primary" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                <span class="tracking-wide">云影<span class="text-primary">聚合</span></span>
+            </div>
+
+            <!-- 右侧功能区 -->
+            <div class="flex items-center gap-3 flex-1 justify-end max-w-2xl">
+                
+                <!-- 搜索框 -->
+                <div class="relative w-full max-w-md group">
+                    <input v-model="searchWd" @keyup.enter="doSearch" type="text" 
+                        placeholder="搜索全网资源..."
+                        class="w-full bg-gray-800/50 border border-gray-700 rounded-full pl-5 pr-10 py-2 text-sm text-gray-200 focus:bg-gray-800 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-inner">
+                    <button @click="doSearch" class="absolute right-3 top-2 text-gray-400 hover:text-white transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </button>
+                </div>
+
+                <!-- 线路切换 (点击触发) -->
+                <div class="relative">
+                    <button @click="toggleSourceMenu" 
+                        class="flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-xs md:text-sm text-gray-300 transition shadow-sm">
+                        <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                        <span class="max-w-[80px] truncate font-medium">{{ curApiName }}</span>
+                        <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+
+                    <!-- 点击空白处关闭菜单的遮罩 -->
+                    <div v-if="showSourceMenu" @click="showSourceMenu = false" class="fixed inset-0 z-40 cursor-default"></div>
+
+                    <!-- 下拉菜单 -->
+                    <div v-if="showSourceMenu" class="absolute right-0 mt-2 w-48 bg-card border border-gray-600 rounded-lg shadow-2xl z-50 py-1 overflow-hidden ring-1 ring-black ring-opacity-5">
+                        <div class="px-4 py-2 text-xs text-gray-500 bg-gray-800/50 border-b border-gray-700 font-bold">选择数据源</div>
+                        <div v-for="(api, i) in apiList" :key="i" 
+                             @click="changeApi(i)"
+                             class="px-4 py-3 text-sm hover:bg-primary hover:text-white cursor-pointer text-gray-300 flex justify-between items-center transition-colors border-b border-gray-700/50 last:border-0">
+                            {{ api.name }}
+                            <span v-if="curApiIdx === i" class="text-primary bg-white rounded-full p-0.5 w-4 h-4 flex items-center justify-center text-[10px] font-bold">✓</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="flex-1 container mx-auto px-4 py-8 relative">
+        
+        <div v-if="loading" class="absolute inset-0 z-40 flex flex-col items-center justify-start pt-32 bg-dark/50 backdrop-blur-sm transition-opacity">
+            <div class="animate-spin rounded-full h-12 w-12 border-4 border-gray-700 border-t-primary"></div>
+            <p class="mt-4 text-gray-400 text-sm font-medium tracking-wider">正在极速加载中...</p>
+        </div>
+
+        <!-- 详情页视图 -->
+        <div v-if="detail" class="animate-fade-in">
+            <button @click="detail = null" class="mb-6 text-gray-400 hover:text-white flex items-center gap-2 text-sm font-medium transition group">
+                <span class="bg-gray-800 p-1.5 rounded-full group-hover:bg-primary group-hover:text-white transition">⬅</span> 
+                返回列表
+            </button>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                <!-- 左侧：播放区域 -->
+                <div class="lg:col-span-3 space-y-5">
+                    <div class="aspect-w-16 aspect-h-9 bg-black rounded-2xl overflow-hidden shadow-2xl ring-1 ring-gray-800 relative z-10" style="aspect-ratio: 16/9;">
+                        <div ref="playerRef" class="w-full h-full"></div>
+                    </div>
+                    
+                    <!-- 播放设置面板 -->
+                    <div class="bg-card/50 backdrop-blur border border-gray-700/50 rounded-xl p-4 flex flex-wrap items-center gap-6 text-sm text-gray-300 shadow-inner">
+                        <label class="flex items-center gap-2 cursor-pointer hover:text-white select-none">
+                            <input type="checkbox" v-model="isAutoNext" class="w-4 h-4 rounded bg-gray-700 border-gray-600 text-primary focus:ring-primary">
+                            <span class="font-medium">自动下一集</span>
+                        </label>
+                        <div class="w-px h-5 bg-gray-700"></div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-gray-400">跳过片头</span>
+                            <div class="relative">
+                                <input type="number" v-model.number="skipHead" class="w-16 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-center text-white focus:border-primary outline-none text-xs">
+                                <span class="absolute right-2 top-1.5 text-xs text-gray-500">秒</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-gray-400">跳过片尾</span>
+                            <div class="relative">
+                                <input type="number" v-model.number="skipTail" class="w-16 bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-center text-white focus:border-primary outline-none text-xs">
+                                <span class="absolute right-2 top-1.5 text-xs text-gray-500">秒</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h1 class="text-3xl font-bold text-white tracking-tight">{{ getName(detail) }}</h1>
+                        <div class="flex flex-wrap gap-2 mt-3 text-xs text-gray-400 font-medium">
+                            <span class="bg-gray-800 border border-gray-700 px-2.5 py-1 rounded-md text-gray-300">{{ detail.type_name }}</span>
+                            <span class="bg-gray-800 border border-gray-700 px-2.5 py-1 rounded-md">{{ detail.vod_year }}</span>
+                            <span class="bg-gray-800 border border-gray-700 px-2.5 py-1 rounded-md">{{ detail.vod_area }}</span>
+                            <span class="bg-gray-800 border border-gray-700 px-2.5 py-1 rounded-md">更新: {{ detail.vod_time }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-card rounded-xl p-6 border border-gray-700/50">
+                        <h3 class="font-bold mb-3 text-lg text-white flex items-center gap-2">
+                            <span class="w-1 h-5 bg-primary rounded-full"></span> 剧情简介
+                        </h3>
+                        <div class="text-gray-400 text-sm leading-7" v-html="getContent(detail)"></div>
+                    </div>
+                </div>
+
+                <!-- 右侧：选集 -->
+                <div class="bg-card rounded-2xl border border-gray-700 flex flex-col h-[600px] lg:h-auto shadow-xl">
+                    <div class="p-4 border-b border-gray-700 bg-gray-800/50 rounded-t-2xl flex justify-between items-center">
+                        <span class="font-bold text-white">选集列表</span>
+                        <span class="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">{{ episodes.length }} 集</span>
+                    </div>
+                    <div class="p-3 overflow-y-auto flex-1 grid grid-cols-3 gap-2 content-start custom-scrollbar">
+                        <button v-for="(ep, idx) in episodes" :key="idx" 
+                            @click="play(ep.url, idx)"
+                            :class="['text-xs py-2.5 px-1 rounded-lg truncate transition-all duration-200 border border-transparent', 
+                            playIndex === idx ? 'bg-primary text-white shadow-lg scale-105 font-bold' : 'bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white hover:border-gray-600']">
+                            {{ ep.name }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 列表页视图 -->
+        <div v-else>
+            <!-- 分类筛选 (优化样式) -->
+            <div class="mb-8 overflow-hidden">
+                <div class="flex flex-wrap gap-2 justify-center md:justify-start">
+                    <button @click="changeClass('')" 
+                        :class="['px-5 py-1.5 rounded-full text-sm transition-all duration-300 shadow-sm', 
+                        curClassId === '' ? 'bg-primary text-white font-bold ring-2 ring-primary ring-offset-2 ring-offset-[#0f172a]' : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white']">
+                        全部
+                    </button>
+                    <button v-for="c in classes" :key="c.type_id" 
+                        @click="changeClass(c.type_id)"
+                        :class="['px-5 py-1.5 rounded-full text-sm transition-all duration-300 shadow-sm', 
+                        curClassId == c.type_id ? 'bg-primary text-white font-bold ring-2 ring-primary ring-offset-2 ring-offset-[#0f172a]' : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white']">
+                        {{ c.type_name }}
+                    </button>
+                </div>
+            </div>
+
+            <!-- 列表网格 -->
+            <div v-if="list.length > 0" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                <div v-for="item in list" :key="item.id" @click="fetchDetail(item)"
+                     class="group relative bg-card rounded-xl overflow-hidden cursor-pointer border border-gray-800 hover:border-primary/50 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300">
+                    
+                    <div class="aspect-w-2 aspect-h-3 relative overflow-hidden bg-gray-800" style="aspect-ratio: 2/3;">
+                        <img :src="getPic(item)" class="w-full h-full object-cover group-hover:scale-110 transition duration-700 ease-out" loading="lazy" @error="imgErr">
+                        
+                        <div v-if="item.vod_remarks || item.vod_score" 
+                             class="absolute top-2 right-2 bg-black/70 backdrop-blur-sm text-white text-[10px] px-2 py-0.5 rounded-md shadow border border-white/10">
+                            {{ item.vod_remarks || item.vod_score }}
+                        </div>
+                        
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition"></div>
+
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300 scale-90 group-hover:scale-100">
+                             <div class="w-12 h-12 bg-primary/90 rounded-full flex items-center justify-center shadow-lg backdrop-blur text-white">
+                                <svg class="w-6 h-6 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                             </div>
+                        </div>
+                    </div>
+                    
+                    <div class="p-4">
+                        <h3 class="text-sm font-bold text-gray-100 line-clamp-1 group-hover:text-primary transition">{{ getName(item) }}</h3>
+                        <div class="flex justify-between items-center mt-2 text-xs text-gray-500 font-medium">
+                            <span class="bg-gray-800 px-1.5 py-0.5 rounded">{{ item.type_name }}</span>
+                            <span v-if="item.vod_year">{{ item.vod_year }}</span>
+                            <span v-else-if="item.vod_time">{{ item.vod_time.split(' ')[0] }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div v-else-if="!loading" class="text-center py-40 text-gray-600">
+                <div class="text-7xl mb-6 opacity-30">📽️</div>
+                <p class="text-lg font-medium">没有找到相关内容</p>
+                <p class="text-sm mt-2">请尝试切换其他分类或搜索关键词</p>
+            </div>
+
+            <!-- 分页 -->
+            <div class="flex justify-center mt-12 gap-3 pb-10" v-if="list.length > 0">
+                <button @click="pg--; load()" :disabled="pg <= 1" 
+                    class="px-5 py-2 bg-card border border-gray-700 rounded-lg text-sm text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-primary hover:text-white hover:border-primary transition font-medium">
+                    上一页
+                </button>
+                <span class="px-5 py-2 text-gray-400 text-sm bg-gray-900 rounded-lg border border-gray-800 font-mono flex items-center">
+                    {{ pg }} / {{ pageCount }}
+                </span>
+                <button @click="pg++; load()" :disabled="pg >= pageCount" 
+                    class="px-5 py-2 bg-card border border-gray-700 rounded-lg text-sm text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-primary hover:text-white hover:border-primary transition font-medium">
+                    下一页
+                </button>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="js/ui-logic.js"></script>
+
+</body>
+</html>

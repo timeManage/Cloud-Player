@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "云影聚合 - 终极版",
+  "version": "3.1",
+  "description": "Iframe桥接+沙盒+外置JS",
+  "action": {
+    "default_title": "打开播放器"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "tabs"
+  ],
+  "host_permissions": [
+    "*://*/*"
+  ],
+  "sandbox": {
+    "pages": ["ui.html"]
+  }
+}
